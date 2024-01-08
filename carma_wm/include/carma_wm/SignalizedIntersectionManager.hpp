@@ -177,7 +177,6 @@ private:
 
   // Max width of lane in meters
   double max_lane_width_ = 4;
-
 };
 
 }  // namespace carma_wm

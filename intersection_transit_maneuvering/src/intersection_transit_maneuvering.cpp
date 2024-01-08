@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023 LEIDOS.
+ * Copyright (C) 2021 LEIDOS.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not
  * use this file except in compliance with the License. You may obtain a copy of
@@ -15,18 +15,17 @@
  *
  */
 
-#include <rclcpp/rclcpp.hpp>
-#include <functional>
-#include <carma_ros2_utils/carma_lifecycle_node.hpp>
+#include <ros/ros.h>
 #include <string>
 #include <algorithm>
 #include <memory>
 #include <boost/uuid/uuid_generators.hpp>
 #include <boost/uuid/uuid_io.hpp>
-#include <trajectory_utils/trajectory_utils.hpp>
-#include <trajectory_utils/conversions/conversions.hpp>
+#include <trajectory_utils/trajectory_utils.h>
+#include <trajectory_utils/conversions/conversions.h>
 #include <sstream>
-#include <intersection_transit_maneuvering/intersection_transit_maneuvering_node.hpp>
+#include <carma_utils/containers/containers.h>
+#include <intersection_transit_maneuvering.h>
 
 
 using oss = std::ostringstream;
@@ -34,13 +33,11 @@ using oss = std::ostringstream;
 namespace intersection_transit_maneuvering
 {
 
-namespace std_ph = std::placeholders;
-
 /**
- * \brief Stream operators for carma_planning_msgs::msg::Maneuver and nested messages.
+ * \brief Stream operators for cav_msgs::Maneuver and nested messages.
  *        NOTE: Does not print meta data
  */
-std::ostream& operator<<(std::ostream& os, carma_planning_msgs::msg::ManeuverParameters m) {
+std::ostream& operator<<(std::ostream& os, cav_msgs::ManeuverParameters m) {
     os << "maneuver_id: " << m.maneuver_id
         << " negotiation_type: " << unsigned(m.negotiation_type)
         << " planning_strategic_plugin: " << m.planning_strategic_plugin
@@ -49,53 +46,53 @@ std::ostream& operator<<(std::ostream& os, carma_planning_msgs::msg::ManeuverPar
     return os;
 }
 
-std::ostream& operator<<(std::ostream& os, carma_planning_msgs::msg::IntersectionTransitStraightManeuver m) {
+std::ostream& operator<<(std::ostream& os, cav_msgs::IntersectionTransitStraightManeuver m) {
     os << "parameters: { " << m.parameters << " }"
         << " start_dist: " << m.start_dist
         << " end_dist: " << m.end_dist
         << " start_speed: " << m.start_speed
         << " end_speed: " << m.end_speed
-        << " start_time: " << std::to_string(rclcpp::Time(m.start_time).seconds())
-        << " end_time: " << std::to_string(rclcpp::Time(m.end_time).seconds())
+        << " start_time: " << m.start_time.toSec()
+        << " end_time: " << m.end_time.toSec()
         << " starting_lane_id: " << m.starting_lane_id
         << " ending_lane_id: " << m.ending_lane_id;
     return os;
 }
 
-std::ostream& operator<<(std::ostream& os, carma_planning_msgs::msg::IntersectionTransitLeftTurnManeuver m) {
+std::ostream& operator<<(std::ostream& os, cav_msgs::IntersectionTransitLeftTurnManeuver m) {
     os << "parameters: { " << m.parameters << " }"
         << " start_dist: " << m.start_dist
         << " end_dist: " << m.end_dist
         << " start_speed: " << m.start_speed
         << " end_speed: " << m.end_speed
-        << " start_time: " << std::to_string(rclcpp::Time(m.start_time).seconds())
-        << " end_time: " << std::to_string(rclcpp::Time(m.end_time).seconds())
+        << " start_time: " << m.start_time.toSec()
+        << " end_time: " << m.end_time.toSec()
         << " starting_lane_id: " << m.starting_lane_id
         << " ending_lane_id: " << m.ending_lane_id;
     return os;
 }
 
-std::ostream& operator<<(std::ostream& os, carma_planning_msgs::msg::IntersectionTransitRightTurnManeuver m) {
+std::ostream& operator<<(std::ostream& os, cav_msgs::IntersectionTransitRightTurnManeuver m) {
     os << "parameters: { " << m.parameters << " }"
         << " start_dist: " << m.start_dist
         << " end_dist: " << m.end_dist
         << " start_speed: " << m.start_speed
         << " end_speed: " << m.end_speed
-        << " start_time: " << std::to_string(rclcpp::Time(m.start_time).seconds())
-        << " end_time: " << std::to_string(rclcpp::Time(m.end_time).seconds())
+        << " start_time: " << m.start_time.toSec()
+        << " end_time: " << m.end_time.toSec()
         << " starting_lane_id: " << m.starting_lane_id
         << " ending_lane_id: " << m.ending_lane_id;
     return os;
 }
 
-std::ostream& operator<<(std::ostream& os, carma_planning_msgs::msg::LaneFollowingManeuver m) {
+std::ostream& operator<<(std::ostream& os, cav_msgs::LaneFollowingManeuver m) {
     os << "parameters: { " << m.parameters << " }"
         << " start_dist: " << m.start_dist
         << " end_dist: " << m.end_dist
         << " start_speed: " << m.start_speed
         << " end_speed: " << m.end_speed
-        << " start_time: " << std::to_string(rclcpp::Time(m.start_time).seconds())
-        << " end_time: " << std::to_string(rclcpp::Time(m.end_time).seconds())
+        << " start_time: " << m.start_time.toSec()
+        << " end_time: " << m.end_time.toSec()
         << " lane_ids: [ ";
 
         for (const auto& i : m.lane_ids)
@@ -107,20 +104,20 @@ std::ostream& operator<<(std::ostream& os, carma_planning_msgs::msg::LaneFollowi
 
 }
 
-std::ostream& operator<<(std::ostream& os, carma_planning_msgs::msg::Maneuver m) {
+std::ostream& operator<<(std::ostream& os, cav_msgs::Maneuver m) {
 
     os << "Maneuver Type: " << unsigned(m.type);
     switch(m.type) {
-        case carma_planning_msgs::msg::Maneuver::INTERSECTION_TRANSIT_STRAIGHT:
+        case cav_msgs::Maneuver::INTERSECTION_TRANSIT_STRAIGHT:
             os << m.intersection_transit_straight_maneuver;
             break;
-        case carma_planning_msgs::msg::Maneuver::INTERSECTION_TRANSIT_LEFT_TURN:
+        case cav_msgs::Maneuver::INTERSECTION_TRANSIT_LEFT_TURN:
             os << m.intersection_transit_left_turn_maneuver;
             break;
-        case carma_planning_msgs::msg::Maneuver::INTERSECTION_TRANSIT_RIGHT_TURN:
+        case cav_msgs::Maneuver::INTERSECTION_TRANSIT_RIGHT_TURN:
             os << m.intersection_transit_right_turn_maneuver;
             break;
-        case carma_planning_msgs::msg::Maneuver::LANE_FOLLOWING:
+        case cav_msgs::Maneuver::LANE_FOLLOWING:
             os << m.lane_following_maneuver;
             break;
         default:
@@ -130,132 +127,118 @@ std::ostream& operator<<(std::ostream& os, carma_planning_msgs::msg::Maneuver m)
     return os;
 }
 
-IntersectionTransitManeuveringNode::IntersectionTransitManeuveringNode(const rclcpp::NodeOptions &options)
-:  carma_guidance_plugins::TacticalPlugin(options) {}
+    IntersectionTransitManeuvering::IntersectionTransitManeuvering(PublishPluginDiscoveryCB plugin_discovery_publisher,
+                                                                     std::shared_ptr<CallInterface> obj)
+    {        
+        plugin_discovery_msg_.name = "intersection_transit_maneuvering";
+        plugin_discovery_msg_.version_id = "v1.0";
+        plugin_discovery_msg_.available = true;
+        plugin_discovery_msg_.activated = true;
+        plugin_discovery_msg_.type = cav_msgs::Plugin::TACTICAL;
+        plugin_discovery_msg_.capability = "tactical_plan/plan_trajectory";
+        plugin_discovery_publisher_ = plugin_discovery_publisher;
+        object_ = obj;
+    }
 
-carma_ros2_utils::CallbackReturn IntersectionTransitManeuveringNode::on_configure_plugin()
-{
- RCLCPP_INFO_STREAM(rclcpp::get_logger("intersection_transit_maneuvering"), "IntersectionTransitManeuveringNode trying to configure");
-                        
- object_ = std::make_shared<intersection_transit_maneuvering::Servicer>();
+    bool IntersectionTransitManeuvering::plan_trajectory_cb(cav_srvs::PlanTrajectoryRequest& req, cav_srvs::PlanTrajectoryResponse& resp)
+    {
 
- client_  = create_client<carma_planning_msgs::srv::PlanTrajectory>("inlanecruising_plugin/plan_trajectory");
+        ros::WallTime start_time = ros::WallTime::now();  // Start timeing the execution time for planning so it can be logged
 
- object_->set_client(client_);
+        std::vector<cav_msgs::Maneuver> maneuver_plan;
 
- //Return success if everthing initialized successfully
-return CallbackReturn::SUCCESS;
+        auto related_maneuvers = resp.related_maneuvers;
 
-}
-
-  bool IntersectionTransitManeuveringNode::get_availability() {
-    return true;
-  }
-
-  std::string IntersectionTransitManeuveringNode::get_version_id() {
-    return "v4.0"; // Version ID matches the value set in this package's package.xml
-  }   
-
-
-    void  IntersectionTransitManeuveringNode::plan_trajectory_callback(
-      std::shared_ptr<rmw_request_id_t>, 
-      carma_planning_msgs::srv::PlanTrajectory::Request::SharedPtr req, 
-      carma_planning_msgs::srv::PlanTrajectory::Response::SharedPtr resp) 
-      {
-
-        std::chrono::system_clock::time_point start_time = std::chrono::system_clock::now();  // Start timing the execution time for planning so it can be logged
-
-        std::vector<carma_planning_msgs::msg::Maneuver> maneuver_plan;
-
-        auto related_maneuvers = resp->related_maneuvers;
-
-        RCLCPP_DEBUG_STREAM(rclcpp::get_logger("intersection_transit_maneuvering"),"Starting planning for maneuver index: " << req->maneuver_index_to_plan);
-        RCLCPP_DEBUG_STREAM(rclcpp::get_logger("intersection_transit_maneuvering"),"req->maneuver_plan.maneuvers.size(): " << req->maneuver_plan.maneuvers.size());
-
-        for(size_t i = req->maneuver_index_to_plan; i < req->maneuver_plan.maneuvers.size(); i++)
+        ROS_DEBUG_STREAM("Starting planning for maneuver index: " << req.maneuver_index_to_plan);
+        ROS_DEBUG_STREAM("req.maneuver_plan.maneuvers.size(): " << req.maneuver_plan.maneuvers.size());
+        for(size_t i = req.maneuver_index_to_plan; i < req.maneuver_plan.maneuvers.size(); i++)
         {
-            RCLCPP_DEBUG_STREAM(rclcpp::get_logger("intersection_transit_maneuvering"),"Looping");
-            if(req->maneuver_plan.maneuvers[i].type == carma_planning_msgs::msg::Maneuver::INTERSECTION_TRANSIT_STRAIGHT ||
-            req->maneuver_plan.maneuvers[i].type == carma_planning_msgs::msg::Maneuver::INTERSECTION_TRANSIT_LEFT_TURN || 
-            req->maneuver_plan.maneuvers[i].type == carma_planning_msgs::msg::Maneuver::INTERSECTION_TRANSIT_RIGHT_TURN )
+            ROS_DEBUG("Looping");
+            if(req.maneuver_plan.maneuvers[i].type == cav_msgs::Maneuver::INTERSECTION_TRANSIT_STRAIGHT ||
+            req.maneuver_plan.maneuvers[i].type == cav_msgs::Maneuver::INTERSECTION_TRANSIT_LEFT_TURN || 
+            req.maneuver_plan.maneuvers[i].type == cav_msgs::Maneuver::INTERSECTION_TRANSIT_RIGHT_TURN )
             {
-                RCLCPP_DEBUG_STREAM(rclcpp::get_logger("intersection_transit_maneuvering"),"Found valid maneuver for planning at index: " << i);
-                maneuver_plan.push_back(req->maneuver_plan.maneuvers[i]);
+                ROS_DEBUG_STREAM("Found valid maneuver for planning at index: " << i);
+                maneuver_plan.push_back(req.maneuver_plan.maneuvers[i]);
                 related_maneuvers.push_back(i);
             }
             else
-            {
-                break;
-            }
+                {
+                    break;
+                }
         }
 
+
         converted_maneuvers_ = convert_maneuver_plan(maneuver_plan);
-        auto new_req = std::make_shared<carma_planning_msgs::srv::PlanTrajectory::Request> ();
+        cav_srvs::PlanTrajectoryRequest new_req;
+
 
         for(auto i : converted_maneuvers_)
         {
-            new_req->maneuver_plan.maneuvers.push_back(i);
+            new_req.maneuver_plan.maneuvers.push_back(i);
         }
 
-        new_req->header = req->header;
-        new_req->vehicle_state = req->vehicle_state;
-        new_req->initial_trajectory_plan = req->initial_trajectory_plan;
-        carma_planning_msgs::srv::PlanTrajectory::Response::SharedPtr ilc_resp = std::make_shared<carma_planning_msgs::srv::PlanTrajectory::Response>();
-        object_->call(new_req,ilc_resp);
+            new_req.header = req.header;
+            new_req.vehicle_state = req.vehicle_state;
+            new_req.initial_trajectory_plan = req.initial_trajectory_plan;
 
-        if(ilc_resp->trajectory_plan.trajectory_points.empty())//Since we're using an interface for this process, the call() functionality will come from somewhere else
+
+        ROS_DEBUG_STREAM("About to call client for service: " << object_->getTopic());
+        ROS_DEBUG_STREAM("Client service actually exists: " << object_->exists());
+
+
+        if(object_->call(new_req,resp))//Since we're using an interface for this process, the call() functionality will come from somewhere else
         {
-           RCLCPP_DEBUG_STREAM(rclcpp::get_logger("intersection_transit_maneuvering"),"Failed to call service");
-           return ;
+            ROS_DEBUG_STREAM("Call Successful");
         } else {
-            RCLCPP_DEBUG_STREAM(rclcpp::get_logger("intersection_transit_maneuvering"),"Call Successful");
-            resp->trajectory_plan = ilc_resp->trajectory_plan;
+            ROS_DEBUG_STREAM("Failed to call service");
+            return false;
         }
 
 
-        resp->related_maneuvers = related_maneuvers; // Set the related maneuvers using the origional maneuver indexs not those sent to inlane-cruising
+        resp.related_maneuvers = related_maneuvers; // Set the related maneuvers using the origional maneuver indexs not those sent to inlane-cruising
         for (auto maneuver : related_maneuvers) {
-            resp->maneuver_status.push_back(carma_planning_msgs::srv::PlanTrajectory::Response::MANEUVER_IN_PROGRESS);
+            resp.maneuver_status.push_back(cav_srvs::PlanTrajectory::Response::MANEUVER_IN_PROGRESS);
         }
 
-        std::chrono::system_clock::time_point end_time = std::chrono::system_clock::now();  // Start timing the execution time for planning so it can be logged
+        ros::WallTime end_time = ros::WallTime::now();
 
-        auto duration = end_time - start_time;
-        RCLCPP_DEBUG_STREAM(rclcpp::get_logger("intersection_transit_maneuvering"),"ExecutionTime: " <<  std::chrono::duration<double>(duration).count());
-        return ; 
+        ros::WallDuration duration = end_time - start_time;
+        ROS_DEBUG_STREAM("ExecutionTime: " << duration.toSec());
+        return true;
     }
    
-    std::vector<carma_planning_msgs::msg::Maneuver> IntersectionTransitManeuveringNode::convert_maneuver_plan(const std::vector<carma_planning_msgs::msg::Maneuver>& maneuvers)
+    std::vector<cav_msgs::Maneuver> IntersectionTransitManeuvering::convert_maneuver_plan(const std::vector<cav_msgs::Maneuver>& maneuvers)
     {
-       if (maneuvers.size() == 0)
+        if (maneuvers.size() == 0)
         {
             throw std::invalid_argument("No maneuvers to convert");
         }
 
-        std::vector<carma_planning_msgs::msg::Maneuver> new_maneuver_plan;
-        carma_planning_msgs::msg::Maneuver new_maneuver;
-        new_maneuver.type = carma_planning_msgs::msg::Maneuver::LANE_FOLLOWING; //All of the converted maneuvers will be of type LANE_FOLLOWING
-        RCLCPP_DEBUG_STREAM(rclcpp::get_logger("intersection_transit_maneuvering"),"Input Maneuver Type = "<< static_cast<int>(maneuvers.front().type));
+        std::vector<cav_msgs::Maneuver> new_maneuver_plan;
+        cav_msgs::Maneuver new_maneuver;
+        new_maneuver.type = cav_msgs::Maneuver::LANE_FOLLOWING; //All of the converted maneuvers will be of type LANE_FOLLOWING
+        ROS_DEBUG_STREAM("Input Maneuver Type = "<< static_cast<int>(maneuvers.front().type));
         for(const auto& maneuver : maneuvers)
         {
-            //Throw exception if the manuever type does not match INTERSECTION_TRANSIT
-            if ( maneuver.type != carma_planning_msgs::msg::Maneuver::INTERSECTION_TRANSIT_STRAIGHT &&
-                maneuver.type != carma_planning_msgs::msg::Maneuver::INTERSECTION_TRANSIT_LEFT_TURN &&
-                maneuver.type != carma_planning_msgs::msg::Maneuver::INTERSECTION_TRANSIT_RIGHT_TURN)
+            /*Throw exception if the manuever type does not match INTERSECTION_TRANSIT*/
+            if ( maneuver.type != cav_msgs::Maneuver::INTERSECTION_TRANSIT_STRAIGHT &&
+                maneuver.type != cav_msgs::Maneuver::INTERSECTION_TRANSIT_LEFT_TURN &&
+                maneuver.type != cav_msgs::Maneuver::INTERSECTION_TRANSIT_RIGHT_TURN)
                 {
                     throw std::invalid_argument("Intersection transit maneuvering does not support this maneuver type");
                 }
 
-            //Convert IT Straight
-            if (maneuver.type == carma_planning_msgs::msg::Maneuver::INTERSECTION_TRANSIT_STRAIGHT)
+            /*Convert IT Straight*/
+            if (maneuver.type == cav_msgs::Maneuver::INTERSECTION_TRANSIT_STRAIGHT)
             {
-                RCLCPP_DEBUG_STREAM(rclcpp::get_logger("intersection_transit_maneuvering"),"Converting INTERSECTION_TRANSIT_STRAIGHT");
+                ROS_DEBUG_STREAM("Converting INTERSECTION_TRANSIT_STRAIGHT");
 
                 new_maneuver.lane_following_maneuver.parameters.maneuver_id = maneuver.intersection_transit_straight_maneuver.parameters.maneuver_id;
                 new_maneuver.lane_following_maneuver.parameters.planning_strategic_plugin = maneuver.intersection_transit_straight_maneuver.parameters.planning_strategic_plugin;
                 new_maneuver.lane_following_maneuver.parameters.planning_tactical_plugin = maneuver.intersection_transit_straight_maneuver.parameters.planning_tactical_plugin;
                 new_maneuver.lane_following_maneuver.parameters.negotiation_type = maneuver.intersection_transit_straight_maneuver.parameters.negotiation_type;
-                new_maneuver.lane_following_maneuver.parameters.presence_vector = carma_planning_msgs::msg::ManeuverParameters::HAS_TACTICAL_PLUGIN;
+                new_maneuver.lane_following_maneuver.parameters.presence_vector = cav_msgs::ManeuverParameters::HAS_TACTICAL_PLUGIN;
 
                 new_maneuver.lane_following_maneuver.start_dist = maneuver.intersection_transit_straight_maneuver.start_dist;
                 new_maneuver.lane_following_maneuver.start_speed = maneuver.intersection_transit_straight_maneuver.start_speed;
@@ -271,16 +254,16 @@ return CallbackReturn::SUCCESS;
                 new_maneuver_plan.push_back(new_maneuver);
             }
 
-             //Convert IT LEFT TURN
-            if (maneuver.type == carma_planning_msgs::msg::Maneuver::INTERSECTION_TRANSIT_LEFT_TURN)
+             /*Convert IT LEFT TURN*/
+            if (maneuver.type == cav_msgs::Maneuver::INTERSECTION_TRANSIT_LEFT_TURN)
             {
-                RCLCPP_DEBUG_STREAM(rclcpp::get_logger("intersection_transit_maneuvering"),"Converting INTERSECTION_TRANSIT_LEFT_TURN");
+                ROS_DEBUG_STREAM("Converting INTERSECTION_TRANSIT_LEFT_TURN");
 
                 new_maneuver.lane_following_maneuver.parameters.maneuver_id = maneuver.intersection_transit_left_turn_maneuver.parameters.maneuver_id;
                 new_maneuver.lane_following_maneuver.parameters.planning_strategic_plugin = maneuver.intersection_transit_left_turn_maneuver.parameters.planning_strategic_plugin;
                 new_maneuver.lane_following_maneuver.parameters.planning_tactical_plugin = maneuver.intersection_transit_left_turn_maneuver.parameters.planning_tactical_plugin;
                 new_maneuver.lane_following_maneuver.parameters.negotiation_type = maneuver.intersection_transit_left_turn_maneuver.parameters.negotiation_type;
-                new_maneuver.lane_following_maneuver.parameters.presence_vector = carma_planning_msgs::msg::ManeuverParameters::HAS_TACTICAL_PLUGIN;
+                new_maneuver.lane_following_maneuver.parameters.presence_vector = cav_msgs::ManeuverParameters::HAS_TACTICAL_PLUGIN;
 
                 new_maneuver.lane_following_maneuver.start_dist = maneuver.intersection_transit_left_turn_maneuver.start_dist;
                 new_maneuver.lane_following_maneuver.start_speed = maneuver.intersection_transit_left_turn_maneuver.start_speed;
@@ -295,17 +278,17 @@ return CallbackReturn::SUCCESS;
                 new_maneuver_plan.push_back(new_maneuver);
             }
 
-             //Convert IT RIGHT TURN
-            if (maneuver.type == carma_planning_msgs::msg::Maneuver::INTERSECTION_TRANSIT_RIGHT_TURN)
+             /*Convert IT RIGHT TURN*/
+            if (maneuver.type == cav_msgs::Maneuver::INTERSECTION_TRANSIT_RIGHT_TURN)
             {
 
-                RCLCPP_DEBUG_STREAM(rclcpp::get_logger("intersection_transit_maneuvering"),"Converting INTERSECTION_TRANSIT_RIGHT_TURN");
+                ROS_DEBUG_STREAM("Converting INTERSECTION_TRANSIT_RIGHT_TURN");
 
                 new_maneuver.lane_following_maneuver.parameters.maneuver_id = maneuver.intersection_transit_right_turn_maneuver.parameters.maneuver_id;
                 new_maneuver.lane_following_maneuver.parameters.planning_strategic_plugin = maneuver.intersection_transit_right_turn_maneuver.parameters.planning_strategic_plugin;
                 new_maneuver.lane_following_maneuver.parameters.planning_tactical_plugin = maneuver.intersection_transit_right_turn_maneuver.parameters.planning_tactical_plugin;
                 new_maneuver.lane_following_maneuver.parameters.negotiation_type = maneuver.intersection_transit_right_turn_maneuver.parameters.negotiation_type;
-                new_maneuver.lane_following_maneuver.parameters.presence_vector = carma_planning_msgs::msg::ManeuverParameters::HAS_TACTICAL_PLUGIN;
+                new_maneuver.lane_following_maneuver.parameters.presence_vector = cav_msgs::ManeuverParameters::HAS_TACTICAL_PLUGIN;
 
                 new_maneuver.lane_following_maneuver.start_dist = maneuver.intersection_transit_right_turn_maneuver.start_dist;
                 new_maneuver.lane_following_maneuver.start_speed = maneuver.intersection_transit_right_turn_maneuver.start_speed;
@@ -320,17 +303,27 @@ return CallbackReturn::SUCCESS;
                 new_maneuver_plan.push_back(new_maneuver);
             }
 
-            RCLCPP_DEBUG_STREAM(rclcpp::get_logger("intersection_transit_maneuvering"),"Original Maneuver : " << maneuver << std::endl <<   "Converted Maneuver: " << new_maneuver);
+            ROS_DEBUG_STREAM("Original Maneuver : " << maneuver << std::endl 
+                        <<   "Converted Maneuver: " << new_maneuver);
   
-        }//end for-loop 
+        }//end for-loop
 
-        return new_maneuver_plan; 
+        return new_maneuver_plan;
 
     }
 
+    bool IntersectionTransitManeuvering::onSpin()
+    {
+        plugin_discovery_publisher_(plugin_discovery_msg_);
+        return true;
+    }
+
+    
+
+
+
+
+
+
+
 }
-
-#include "rclcpp_components/register_node_macro.hpp"
-
-// Register the component with class_loader
-RCLCPP_COMPONENTS_REGISTER_NODE(intersection_transit_maneuvering::IntersectionTransitManeuveringNode)

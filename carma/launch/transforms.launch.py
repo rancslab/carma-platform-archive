@@ -15,9 +15,6 @@
 from launch import LaunchDescription
 from launch_ros.actions import Node
 from carma_ros2_utils.launch.get_current_namespace import GetCurrentNamespace
-from launch.substitutions import LaunchConfiguration
-from launch.actions import DeclareLaunchArgument
-
 import os
 
 
@@ -25,12 +22,6 @@ def generate_launch_description():
     """
     Launch robot_state_publisher to read in URDF file
     """
-    use_sim_time = LaunchConfiguration('use_sim_time')
-    declare_use_sim_time_arg = DeclareLaunchArgument(
-        name = 'use_sim_time',
-        default_value = "False",
-        description = "True if simulation mode is on"
-    )
 
     # Since the file needs to be actually read a substition does not work here
     # For now the path must be hardcoded so it can be read into a string and passed as a parameter
@@ -42,13 +33,9 @@ def generate_launch_description():
         executable='robot_state_publisher',
         name='robot_state_publisher',
         namespace=GetCurrentNamespace(),
-        parameters=[
-            {'robot_description': robot_description},
-            {"use_sim_time" : use_sim_time}
-            ]
+        parameters=[{'robot_description': robot_description}]
     )
 
     return LaunchDescription([
-        start_robot_state_publisher_cmd,
-        declare_use_sim_time_arg
+        start_robot_state_publisher_cmd
     ])
