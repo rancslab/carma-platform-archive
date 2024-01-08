@@ -48,7 +48,7 @@
 
 namespace carma_cooperative_perception
 {
-auto to_time_msg(const DDateTime & d_date_time) noexcept -> builtin_interfaces::msg::Time
+auto to_time_msg(const DDateTime & d_date_time) -> builtin_interfaces::msg::Time
 {
   double seconds;
   const auto fractional_secs{
@@ -61,7 +61,7 @@ auto to_time_msg(const DDateTime & d_date_time) noexcept -> builtin_interfaces::
   return msg;
 }
 
-auto calc_detection_time_stamp(DDateTime sdsm_time, const MeasurementTimeOffset & offset) noexcept
+auto calc_detection_time_stamp(DDateTime sdsm_time, const MeasurementTimeOffset & offset)
   -> DDateTime
 {
   sdsm_time.second.value() += offset.measurement_time_offset;
@@ -69,7 +69,7 @@ auto calc_detection_time_stamp(DDateTime sdsm_time, const MeasurementTimeOffset 
   return sdsm_time;
 }
 
-auto to_ddate_time_msg(const builtin_interfaces::msg::Time & builtin_time) noexcept
+auto to_ddate_time_msg(const builtin_interfaces::msg::Time & builtin_time)
   -> j2735_v2x_msgs::msg::DDateTime
 {
   j2735_v2x_msgs::msg::DDateTime ddate_time_output;
@@ -106,7 +106,7 @@ auto to_ddate_time_msg(const builtin_interfaces::msg::Time & builtin_time) noexc
 
 auto calc_sdsm_time_offset(
   const builtin_interfaces::msg::Time & external_object_list_stamp,
-  const builtin_interfaces::msg::Time & external_object_stamp) noexcept
+  const builtin_interfaces::msg::Time & external_object_stamp)
   -> carma_v2x_msgs::msg::MeasurementTimeOffset
 {
   carma_v2x_msgs::msg::MeasurementTimeOffset time_offset;
@@ -127,7 +127,7 @@ auto calc_sdsm_time_offset(
   return time_offset;
 }
 
-auto to_position_msg(const UtmCoordinate & position_utm) noexcept -> geometry_msgs::msg::Point
+auto to_position_msg(const UtmCoordinate & position_utm) -> geometry_msgs::msg::Point
 {
   geometry_msgs::msg::Point msg;
 
@@ -138,14 +138,14 @@ auto to_position_msg(const UtmCoordinate & position_utm) noexcept -> geometry_ms
   return msg;
 }
 
-auto heading_to_enu_yaw(const units::angle::degree_t & heading) noexcept -> units::angle::degree_t
+auto heading_to_enu_yaw(const units::angle::degree_t & heading) -> units::angle::degree_t
 {
   return units::angle::degree_t{std::fmod(-(remove_units(heading) - 90.0) + 360.0, 360.0)};
 }
 
 auto enu_orientation_to_true_heading(
   double yaw, const lanelet::BasicPoint3d & obj_pose,
-  const std::shared_ptr<lanelet::projection::LocalFrameProjector> & map_projection) noexcept
+  const std::shared_ptr<lanelet::projection::LocalFrameProjector> & map_projection)
   -> units::angle::degree_t
 {
   // Get object geodetic position
@@ -172,7 +172,7 @@ auto enu_orientation_to_true_heading(
 // in map frame and external object pose
 auto calc_relative_position(
   const geometry_msgs::msg::PoseStamped & source_pose,
-  const carma_v2x_msgs::msg::PositionOffsetXYZ & position_offset) noexcept
+  const carma_v2x_msgs::msg::PositionOffsetXYZ & position_offset)
   -> carma_v2x_msgs::msg::PositionOffsetXYZ
 {
   carma_v2x_msgs::msg::PositionOffsetXYZ adjusted_offset;
@@ -190,7 +190,7 @@ auto calc_relative_position(
 
 auto transform_pose_from_map_to_wgs84(
   const geometry_msgs::msg::PoseStamped & source_pose,
-  const std::shared_ptr<lanelet::projection::LocalFrameProjector> & map_projection) noexcept
+  const std::shared_ptr<lanelet::projection::LocalFrameProjector> & map_projection)
   -> carma_v2x_msgs::msg::Position3D
 {
   carma_v2x_msgs::msg::Position3D ref_pos;
@@ -207,7 +207,7 @@ auto transform_pose_from_map_to_wgs84(
   return ref_pos;
 }
 
-auto to_detection_list_msg(const carma_v2x_msgs::msg::SensorDataSharingMessage & sdsm) noexcept
+auto to_detection_list_msg(const carma_v2x_msgs::msg::SensorDataSharingMessage & sdsm)
   -> carma_cooperative_perception_interfaces::msg::DetectionList
 {
   carma_cooperative_perception_interfaces::msg::DetectionList detection_list;
@@ -273,15 +273,20 @@ auto to_detection_list_msg(const carma_v2x_msgs::msg::SensorDataSharingMessage &
     switch (common_data.obj_type.object_type) {
       case common_data.obj_type.ANIMAL:
         detection.motion_model = detection.MOTION_MODEL_CTRV;
+        // We don't have a good semantic class mapping for animals
+        detection.semantic_class = detection.SEMANTIC_CLASS_UNKNOWN;
         break;
       case common_data.obj_type.VRU:
         detection.motion_model = detection.MOTION_MODEL_CTRV;
+        detection.semantic_class = detection.SEMANTIC_CLASS_PEDESTRIAN;
         break;
       case common_data.obj_type.VEHICLE:
         detection.motion_model = detection.MOTION_MODEL_CTRV;
+        detection.semantic_class = detection.SEMANTIC_CLASS_SMALL_VEHICLE;
         break;
       default:
         detection.motion_model = detection.MOTION_MODEL_CTRV;
+        detection.semantic_class = detection.SEMANTIC_CLASS_UNKNOWN;
     }
 
     detection_list.detections.push_back(std::move(detection));
@@ -292,7 +297,7 @@ auto to_detection_list_msg(const carma_v2x_msgs::msg::SensorDataSharingMessage &
 
 auto to_detection_msg(
   const carma_perception_msgs::msg::ExternalObject & object,
-  const MotionModelMapping & motion_model_mapping) noexcept
+  const MotionModelMapping & motion_model_mapping)
   -> carma_cooperative_perception_interfaces::msg::Detection
 {
   carma_cooperative_perception_interfaces::msg::Detection detection;
@@ -314,27 +319,32 @@ auto to_detection_msg(
     detection.pose = object.pose;
   }
 
-  if (object.presence_vector & object.VELOCITY_INST_PRESENCE_VECTOR) {
-    detection.twist = object.velocity_inst;
+  if (object.presence_vector & object.VELOCITY_PRESENCE_VECTOR) {
+    detection.twist = object.velocity;
   }
 
   if (object.presence_vector & object.OBJECT_TYPE_PRESENCE_VECTOR) {
     switch (object.object_type) {
       case object.SMALL_VEHICLE:
         detection.motion_model = motion_model_mapping.small_vehicle_model;
+        detection.semantic_class = detection.SEMANTIC_CLASS_SMALL_VEHICLE;
         break;
       case object.LARGE_VEHICLE:
         detection.motion_model = motion_model_mapping.large_vehicle_model;
+        detection.semantic_class = detection.SEMANTIC_CLASS_LARGE_VEHICLE;
         break;
       case object.MOTORCYCLE:
         detection.motion_model = motion_model_mapping.motorcycle_model;
+        detection.semantic_class = detection.SEMANTIC_CLASS_MOTORCYCLE;
         break;
       case object.PEDESTRIAN:
         detection.motion_model = motion_model_mapping.pedestrian_model;
+        detection.semantic_class = detection.SEMANTIC_CLASS_PEDESTRIAN;
         break;
       case object.UNKNOWN:
       default:
         detection.motion_model = motion_model_mapping.unknown_model;
+        detection.semantic_class = detection.SEMANTIC_CLASS_UNKNOWN;
     }
   }
 
@@ -343,7 +353,7 @@ auto to_detection_msg(
 
 auto to_detection_list_msg(
   const carma_perception_msgs::msg::ExternalObjectList & object_list,
-  const MotionModelMapping & motion_model_mapping) noexcept
+  const MotionModelMapping & motion_model_mapping)
   -> carma_cooperative_perception_interfaces::msg::DetectionList
 {
   carma_cooperative_perception_interfaces::msg::DetectionList detection_list;
@@ -358,8 +368,7 @@ auto to_detection_list_msg(
   return detection_list;
 }
 
-auto to_external_object_msg(
-  const carma_cooperative_perception_interfaces::msg::Track & track) noexcept
+auto to_external_object_msg(const carma_cooperative_perception_interfaces::msg::Track & track)
   -> carma_perception_msgs::msg::ExternalObject
 {
   carma_perception_msgs::msg::ExternalObject external_object;
@@ -382,13 +391,45 @@ auto to_external_object_msg(
   external_object.pose = track.pose;
 
   external_object.presence_vector |= external_object.VELOCITY_PRESENCE_VECTOR;
-  external_object.velocity = track.twist;
+
+  const auto track_longitudinal_velocity{track.twist.twist.linear.x};
+  const auto track_orientation = track.pose.pose.orientation;
+
+  tf2::Quaternion q(
+    track_orientation.x, track_orientation.y, track_orientation.z, track_orientation.w);
+  tf2::Matrix3x3 m(q);
+  double roll, pitch, yaw;
+  m.getRPY(roll, pitch, yaw);
+
+  external_object.velocity.twist.linear.x = track_longitudinal_velocity * std::cos(yaw);
+  external_object.velocity.twist.linear.y = track_longitudinal_velocity * std::sin(yaw);
+
+  external_object.object_type = track.semantic_class;
+
+  external_object.presence_vector |= external_object.OBJECT_TYPE_PRESENCE_VECTOR;
+  switch (track.semantic_class) {
+    case track.SEMANTIC_CLASS_SMALL_VEHICLE:
+      external_object.object_type = external_object.SMALL_VEHICLE;
+      break;
+    case track.SEMANTIC_CLASS_LARGE_VEHICLE:
+      external_object.object_type = external_object.LARGE_VEHICLE;
+      break;
+    case track.SEMANTIC_CLASS_MOTORCYCLE:
+      external_object.object_type = external_object.MOTORCYCLE;
+      break;
+    case track.SEMANTIC_CLASS_PEDESTRIAN:
+      external_object.object_type = external_object.PEDESTRIAN;
+      break;
+    case track.SEMANTIC_CLASS_UNKNOWN:
+    default:
+      external_object.object_type = external_object.UNKNOWN;
+  };
 
   return external_object;
 }
 
 auto to_external_object_list_msg(
-  const carma_cooperative_perception_interfaces::msg::TrackList & track_list) noexcept
+  const carma_cooperative_perception_interfaces::msg::TrackList & track_list)
   -> carma_perception_msgs::msg::ExternalObjectList
 {
   carma_perception_msgs::msg::ExternalObjectList external_object_list;
@@ -403,7 +444,7 @@ auto to_external_object_list_msg(
 auto to_sdsm_msg(
   const carma_perception_msgs::msg::ExternalObjectList & external_object_list,
   const geometry_msgs::msg::PoseStamped & current_pose,
-  const std::shared_ptr<lanelet::projection::LocalFrameProjector> & map_projection) noexcept
+  const std::shared_ptr<lanelet::projection::LocalFrameProjector> & map_projection)
   -> carma_v2x_msgs::msg::SensorDataSharingMessage
 {
   carma_v2x_msgs::msg::SensorDataSharingMessage sdsm;
@@ -434,7 +475,7 @@ auto to_sdsm_msg(
 
 auto to_detected_object_data_msg(
   const carma_perception_msgs::msg::ExternalObject & external_object,
-  const std::shared_ptr<lanelet::projection::LocalFrameProjector> & map_projection) noexcept
+  const std::shared_ptr<lanelet::projection::LocalFrameProjector> & map_projection)
   -> carma_v2x_msgs::msg::DetectedObjectData
 {
   carma_v2x_msgs::msg::DetectedObjectData detected_object_data;
@@ -472,13 +513,13 @@ auto to_detected_object_data_msg(
   }
 
   // speed/speed_z - convert vector velocity to scalar speed val given x/y components
-  if (external_object.presence_vector & external_object.VELOCITY_INST_PRESENCE_VECTOR) {
-    detected_object_common_data.speed.speed = std::hypot(
-      external_object.velocity_inst.twist.linear.x, external_object.velocity_inst.twist.linear.y);
+  if (external_object.presence_vector & external_object.VELOCITY_PRESENCE_VECTOR) {
+    detected_object_common_data.speed.speed =
+      std::hypot(external_object.velocity.twist.linear.x, external_object.velocity.twist.linear.y);
 
     detected_object_common_data.presence_vector |=
       carma_v2x_msgs::msg::DetectedObjectCommonData::HAS_SPEED_Z;
-    detected_object_common_data.speed_z.speed = external_object.velocity_inst.twist.linear.z;
+    detected_object_common_data.speed_z.speed = external_object.velocity.twist.linear.z;
 
     // heading - convert ang vel to scale heading
     lanelet::BasicPoint3d external_object_position{

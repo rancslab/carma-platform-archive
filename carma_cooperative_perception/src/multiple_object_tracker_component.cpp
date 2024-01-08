@@ -36,8 +36,44 @@ namespace carma_cooperative_perception
 
 namespace mot = multiple_object_tracking;
 
-auto make_ctrv_detection(
-  const carma_cooperative_perception_interfaces::msg::Detection & msg) noexcept -> Detection
+auto make_semantic_class(std::size_t numeric_value)
+{
+  switch (numeric_value) {
+    case 0:
+      return mot::SemanticClass::kUnknown;
+    case 1:
+      return mot::SemanticClass::kSmallVehicle;
+    case 2:
+      return mot::SemanticClass::kLargeVehicle;
+    case 3:
+      return mot::SemanticClass::kPedestrian;
+    case 4:
+      return mot::SemanticClass::kMotorcycle;
+  }
+
+  return mot::SemanticClass::kUnknown;
+}
+
+auto semantic_class_to_numeric_value(mot::SemanticClass semantic_class)
+{
+  switch (semantic_class) {
+    case mot::SemanticClass::kUnknown:
+      return 0;
+    case mot::SemanticClass::kSmallVehicle:
+      return 1;
+    case mot::SemanticClass::kLargeVehicle:
+      return 2;
+    case mot::SemanticClass::kPedestrian:
+      return 3;
+    case mot::SemanticClass::kMotorcycle:
+      return 4;
+  }
+
+  return 0;
+}
+
+auto make_ctrv_detection(const carma_cooperative_perception_interfaces::msg::Detection & msg)
+  -> Detection
 {
   const auto timestamp{
     units::time::second_t{static_cast<double>(msg.header.stamp.sec)} +
@@ -63,13 +99,19 @@ auto make_ctrv_detection(
     mot::Angle{units::angle::radian_t{yaw}},
     units::angular_velocity::radians_per_second_t{msg.twist.twist.angular.z}};
 
-  const mot::CtrvStateCovariance covariance = mot::CtrvStateCovariance::Zero();
+  mot::CtrvStateCovariance covariance = mot::CtrvStateCovariance::Zero();
+  covariance(0, 0) = msg.pose.covariance.at(0);
+  covariance(1, 1) = msg.pose.covariance.at(7);
+  covariance(2, 2) = msg.twist.covariance.at(0);
+  covariance(3, 3) = msg.pose.covariance.at(35);
+  covariance(4, 4) = msg.twist.covariance.at(35);
 
-  return mot::CtrvDetection{timestamp, state, covariance, mot::Uuid{msg.id}};
+  return mot::CtrvDetection{
+    timestamp, state, covariance, mot::Uuid{msg.id}, make_semantic_class(msg.semantic_class)};
 }
 
-auto make_ctra_detection(
-  const carma_cooperative_perception_interfaces::msg::Detection & msg) noexcept -> Detection
+auto make_ctra_detection(const carma_cooperative_perception_interfaces::msg::Detection & msg)
+  -> Detection
 {
   const auto timestamp{
     units::time::second_t{static_cast<double>(msg.header.stamp.sec)} +
@@ -96,9 +138,16 @@ auto make_ctra_detection(
     units::angular_velocity::radians_per_second_t{msg.twist.twist.angular.z},
     units::acceleration::meters_per_second_squared_t{msg.accel.accel.linear.x}};
 
-  const mot::CtraStateCovariance covariance = mot::CtraStateCovariance::Zero();
+  mot::CtraStateCovariance covariance = mot::CtraStateCovariance::Zero();
+  covariance(0, 0) = msg.pose.covariance.at(0);
+  covariance(1, 1) = msg.pose.covariance.at(7);
+  covariance(2, 2) = msg.twist.covariance.at(0);
+  covariance(3, 3) = msg.pose.covariance.at(35);
+  covariance(4, 4) = msg.twist.covariance.at(35);
+  covariance(5, 5) = msg.accel.covariance.at(0);
 
-  return mot::CtraDetection{timestamp, state, covariance, mot::Uuid{msg.id}};
+  return mot::CtraDetection{
+    timestamp, state, covariance, mot::Uuid{msg.id}, make_semantic_class(msg.semantic_class)};
 }
 
 auto make_detection(const carma_cooperative_perception_interfaces::msg::Detection & msg)
@@ -118,13 +167,13 @@ auto make_detection(const carma_cooperative_perception_interfaces::msg::Detectio
   throw std::runtime_error("unkown motion model type '" + std::to_string(msg.motion_model) + "'");
 }
 
-static auto to_ros_msg(const mot::CtraTrack & track) noexcept
+static auto to_ros_msg(const mot::CtraTrack & track)
 {
   carma_cooperative_perception_interfaces::msg::Track msg;
 
   msg.header.stamp.sec = mot::remove_units(units::math::floor(track.timestamp));
   msg.header.stamp.nanosec = mot::remove_units(
-    units::time::nanosecond_t{units::math::fmod(track.timestamp, units::time::second_t{10.0})});
+    units::time::nanosecond_t{units::math::fmod(track.timestamp, units::time::second_t{1.0})});
   msg.header.frame_id = "map";
 
   msg.id = track.uuid.value();
@@ -144,16 +193,18 @@ static auto to_ros_msg(const mot::CtraTrack & track) noexcept
 
   msg.accel.accel.linear.x = mot::remove_units(track.state.acceleration);
 
+  msg.semantic_class = semantic_class_to_numeric_value(mot::get_semantic_class(track));
+
   return msg;
 }
 
-static auto to_ros_msg(const mot::CtrvTrack & track) noexcept
+static auto to_ros_msg(const mot::CtrvTrack & track)
 {
   carma_cooperative_perception_interfaces::msg::Track msg;
 
   msg.header.stamp.sec = mot::remove_units(units::math::floor(track.timestamp));
   msg.header.stamp.nanosec = mot::remove_units(
-    units::time::nanosecond_t{units::math::fmod(track.timestamp, units::time::second_t{10.0})});
+    units::time::nanosecond_t{units::math::fmod(track.timestamp, units::time::second_t{1.0})});
   msg.header.frame_id = "map";
 
   msg.id = track.uuid.value();
@@ -170,6 +221,8 @@ static auto to_ros_msg(const mot::CtrvTrack & track) noexcept
 
   msg.twist.twist.linear.x = mot::remove_units(track.state.velocity);
   msg.twist.twist.angular.z = mot::remove_units(track.state.yaw_rate);
+
+  msg.semantic_class = semantic_class_to_numeric_value(mot::get_semantic_class(track));
 
   return msg;
 }
@@ -211,15 +264,6 @@ auto MultipleObjectTrackerNode::handle_on_configure(
           this->detection_list_sub_->get_topic_name(), current_state.c_str());
       }
     });
-
-  declare_parameter(
-    "execution_frequency_hz", mot::remove_units(units::frequency::hertz_t{1 / execution_period_}));
-
-  declare_parameter(
-    "track_promotion_threshold", static_cast<int>(track_manager_.get_promotion_threshold().value));
-
-  declare_parameter(
-    "track_removal_threshold", static_cast<int>(track_manager_.get_promotion_threshold().value));
 
   on_set_parameters_callback_ =
     add_on_set_parameters_callback([this](const std::vector<rclcpp::Parameter> & parameters) {
@@ -285,6 +329,15 @@ auto MultipleObjectTrackerNode::handle_on_configure(
       return result;
     });
 
+  declare_parameter(
+    "execution_frequency_hz", mot::remove_units(units::frequency::hertz_t{1 / execution_period_}));
+
+  declare_parameter(
+    "track_promotion_threshold", static_cast<int>(track_manager_.get_promotion_threshold().value));
+
+  declare_parameter(
+    "track_removal_threshold", static_cast<int>(track_manager_.get_promotion_threshold().value));
+
   RCLCPP_INFO(get_logger(), "Lifecycle transition: successfully configured");
 
   return carma_ros2_utils::CallbackReturn::SUCCESS;
@@ -301,7 +354,8 @@ auto MultipleObjectTrackerNode::handle_on_activate(
   }
 
   const std::chrono::duration<double, std::nano> period_ns{mot::remove_units(execution_period_)};
-  pipeline_execution_timer_ = create_wall_timer(period_ns, [this] { execute_pipeline(); });
+  pipeline_execution_timer_ =
+    rclcpp::create_timer(this, this->get_clock(), period_ns, [this] { execute_pipeline(); });
 
   RCLCPP_INFO(get_logger(), "Lifecycle transition: successfully activated");
 
@@ -352,7 +406,7 @@ auto MultipleObjectTrackerNode::handle_on_shutdown(
 }
 
 auto MultipleObjectTrackerNode::store_new_detections(
-  const carma_cooperative_perception_interfaces::msg::DetectionList & msg) noexcept -> void
+  const carma_cooperative_perception_interfaces::msg::DetectionList & msg) -> void
 {
   if (std::size(msg.detections) == 0) {
     RCLCPP_WARN(this->get_logger(), "Not storing detections: incoming detection list is empty");
@@ -382,14 +436,14 @@ auto MultipleObjectTrackerNode::store_new_detections(
 }
 
 static auto temporally_align_detections(
-  std::vector<Detection> & detections, units::time::second_t end_time) noexcept -> void
+  std::vector<Detection> & detections, units::time::second_t end_time) -> void
 {
   for (auto & detection : detections) {
     mot::propagate_to_time(detection, end_time, mot::default_unscented_transform);
   }
 }
 
-static auto predict_track_states(std::vector<Track> tracks, units::time::second_t end_time) noexcept
+static auto predict_track_states(std::vector<Track> tracks, units::time::second_t end_time)
 {
   for (auto & track : tracks) {
     mot::propagate_to_time(track, end_time, mot::default_unscented_transform);
@@ -444,7 +498,11 @@ auto MultipleObjectTrackerNode::execute_pipeline() -> void
     if (has_association(track)) {
       const auto detection_uuids{associations.at(get_uuid(track))};
       const auto first_detection{detection_map[detection_uuids.at(0)]};
-      track = std::visit(mot::covariance_intersection_visitor, track, first_detection);
+      auto predicted_track{track};
+      mot::propagate_to_time(predicted_track, current_time, mot::UnscentedTransform{1.0, 2.0, 0.0});
+      const auto fused_track{
+        std::visit(mot::covariance_intersection_visitor, track, first_detection)};
+      track_manager_.update_track(mot::get_uuid(track), fused_track);
     }
   }
 
