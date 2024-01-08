@@ -5,7 +5,7 @@ repositories:
     version: melodic
   src/autoware.ai:
     type: git
-    url: git@github.com:usdot-fhwa-stol/autoware.ai.git
+    url: git@github.com:VT-ASIM-LAB/autoware.ai.git
     version: carma-develop
   src/avt_vimba_camera:
     type: git
@@ -21,7 +21,7 @@ repositories:
     version: develop
   src/carma-config:
     type: git
-    url: git@github.com:usdot-fhwa-stol/carma-config.git
+    url: git@github.com:rancslab/carma-config.git
     version: develop
   src/carma-delphi-esr-driver:
     type: git
@@ -45,7 +45,7 @@ repositories:
     version: develop
   src/carma-platform:
     type: git
-    url: git@github.com:usdot-fhwa-stol/carma-platform.git
+    url: git@github.com:rancslab/carma-platform.git
     version: develop
   src/carma-ssc-interface-wrapper:
     type: git
@@ -79,3 +79,15 @@ repositories:
     type: git
     url: git@github.com:usdot-fhwa-stol/opendrive2lanelet.git
     version: develop
+  src/dataspeed_can_driver:
+    type: git
+    url: git@github.com:VT-ASIM-LAB/dataspeed_can_driver.git
+    version: master
+  src/dataspeed_controller_driver:
+    type: git
+    url: git@github.com:VT-ASIM-LAB/dataspeed_controller_driver.git
+    version: master
+  src/ouster_lidar_driver:
+    type: git
+    url: git@github.com:VT-ASIM-LAB/ouster_lidar_driver.git
+    version: master
